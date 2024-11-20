@@ -13,7 +13,7 @@ vector<Bucket> partition(Disk* disk, Mem* mem, pair<uint, uint> left_rel,
 	//vector<Bucket> partitions(0, Bucket(disk)); // placeholder
 	//return partitions;
 
-vector<Bucket> partitions(MEM_SIZE_IN_PAGE - 1, Bucket(disk));
+	vector<Bucket> partitions(MEM_SIZE_IN_PAGE - 1, Bucket(disk));
 
     // Process the left relation
     for (uint page_id = left_rel.first; page_id < left_rel.second; ++page_id) {
@@ -24,7 +24,18 @@ vector<Bucket> partitions(MEM_SIZE_IN_PAGE - 1, Bucket(disk));
             uint bucket_id = record.partition_hash() % (MEM_SIZE_IN_PAGE - 1);
             partitions[bucket_id].add_left_rel_page(page_id);
         }
+		mem->reset();
     }
+	// Flush remaining pages for left relation
+    for (uint bucket_id = 0; bucket_id < partitions.size(); ++bucket_id) {
+        Page* output_page = mem->mem_page(bucket_id + 1);
+        if (!output_page->empty()) {
+            uint page_id = mem->flushToDisk(disk, bucket_id + 1);
+            partitions[bucket_id].add_left_rel_page(page_id);
+            output_page->reset();
+        }
+    }
+
 
     // Process the right relation
     for (uint page_id = right_rel.first; page_id < right_rel.second; ++page_id) {
@@ -37,10 +48,16 @@ vector<Bucket> partitions(MEM_SIZE_IN_PAGE - 1, Bucket(disk));
         }
 		mem->reset();
     }
-
+	// Flush remaining pages for right relation
+    for (uint bucket_id = 0; bucket_id < partitions.size(); ++bucket_id) {
+        Page* output_page = mem->mem_page(bucket_id + 1);
+        if (!output_page->empty()) {
+            uint page_id = mem->flushToDisk(disk, bucket_id + 1);
+            partitions[bucket_id].add_right_rel_page(page_id);
+            output_page->reset();
+        }
+    }
     return partitions;
-	
-
 }
 
 /*
@@ -90,13 +107,17 @@ vector<uint> probe(Disk* disk, Mem* mem, vector<Bucket>& partitions) {
                 }
             }
         }
-
-        // Flush remaining output page
-        if (!mem->mem_page(2)->empty()) {
-            uint page_id = mem->flushToDisk(disk, 2);
-            disk_pages.push_back(page_id);
-        }
+		// Flush remaining output page
+		if (mem->mem_page(2)->full()) {
+			uint page_id = mem->flushToDisk(disk, 2);
+			disk_pages.push_back(page_id);
+		}
     }
-
+	// Flush remaining output page
+	// flush todo lo que quede, no solo este
+	if (!mem->mem_page(2)->empty()) {
+		uint page_id = mem->flushToDisk(disk, 2);
+		disk_pages.push_back(page_id);
+	}
     return disk_pages;
 }
