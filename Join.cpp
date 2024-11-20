@@ -24,6 +24,16 @@ vector<Bucket> partition(Disk* disk, Mem* mem, pair<uint, uint> left_rel,
             uint bucket_id = record.partition_hash() % (MEM_SIZE_IN_PAGE - 1);
             partitions[bucket_id].add_left_rel_page(page_id);
         }
+
+		// flush pages to disk
+		for (uint bucket_id = 0; bucket_id < partitions.size(); ++bucket_id) {
+			Page* output_page = mem->mem_page(bucket_id + 1);
+			if (page->full()) {
+				uint page_id = mem->flushToDisk(disk, bucket_id + 1);
+				partitions[bucket_id].add_left_rel_page(page_id);
+				output_page->reset();
+			}
+    	}
 		mem->reset();
     }
 	// Flush remaining pages for left relation
@@ -46,6 +56,16 @@ vector<Bucket> partition(Disk* disk, Mem* mem, pair<uint, uint> left_rel,
             uint bucket_id = record.partition_hash() % (MEM_SIZE_IN_PAGE - 1);
             partitions[bucket_id].add_right_rel_page(page_id);
         }
+
+		// flush pages to disk
+		for (uint bucket_id = 0; bucket_id < partitions.size(); ++bucket_id) {
+			Page* output_page = mem->mem_page(bucket_id + 1);
+			if (page->full()) {
+				uint page_id = mem->flushToDisk(disk, bucket_id + 1);
+				partitions[bucket_id].add_right_rel_page(page_id);
+				output_page->reset();
+			}
+		}
 		mem->reset();
     }
 	// Flush remaining pages for right relation
@@ -66,8 +86,6 @@ vector<Bucket> partition(Disk* disk, Mem* mem, pair<uint, uint> left_rel,
  */
 vector<uint> probe(Disk* disk, Mem* mem, vector<Bucket>& partitions) {
 	// TODO: implement probe phase
-	//vector<uint> disk_pages; // placeholder
-	//return disk_pages;
     vector<uint> disk_pages;
 
     for (Bucket& bucket : partitions) {
